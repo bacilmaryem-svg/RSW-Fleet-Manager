@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'constants.dart';
 import 'firebase_options.dart';
@@ -37,12 +38,19 @@ class RswFleetApp extends StatefulWidget {
 }
 
 class _RswFleetAppState extends State<RswFleetApp> {
-  String? _captainName;
+  String? _captainName; // Login required
   int _pageIndex = 0;
   late Trip _trip;
   List<Cistern> _cisterns = [];
 
   List<String> get _rswTanks => RSW_TANKS;
+
+  // Maritime Theme Colors
+  final Color _primaryBlue = const Color(0xFF0A2342); // Deep Ocean
+  final Color _secondaryBlue = const Color(0xFF0F3460); // Night Sea
+  final Color _accentTeal = const Color(0xFF2CA58D); // Sea Foam
+  final Color _surfaceWhite = const Color(0xFFF0F4F8); // Mist
+  final Color _errorRed = const Color(0xFFE94560); // Warning
 
   @override
   void initState() {
@@ -58,6 +66,12 @@ class _RswFleetAppState extends State<RswFleetApp> {
   void _handleLogin(String captain) {
     setState(() {
       _captainName = captain;
+    });
+  }
+
+  void _handleLogout() {
+    setState(() {
+      _captainName = null;
     });
   }
 
@@ -81,21 +95,46 @@ class _RswFleetAppState extends State<RswFleetApp> {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0EA5E9), // ocean blue
+          seedColor: _primaryBlue,
+          primary: _primaryBlue,
+          secondary: _accentTeal,
+          surface: _surfaceWhite,
+          error: _errorRed,
           brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: const Color(0xFFF5FBFF),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
+        scaffoldBackgroundColor: _surfaceWhite,
+        textTheme: GoogleFonts.latoTextTheme(Theme.of(context).textTheme),
+        appBarTheme: AppBarTheme(
+          backgroundColor: _primaryBlue,
+          foregroundColor: Colors.white,
           elevation: 0,
-          foregroundColor: Color(0xFF0F172A),
-          centerTitle: false,
+          centerTitle: true,
+          titleTextStyle: GoogleFonts.montserrat(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
         ),
-        cardTheme: const CardThemeData(
+        cardTheme: CardThemeData(
           color: Colors.white,
-          surfaceTintColor: Color(0x1A0EA5E9),
-          elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+          surfaceTintColor: Colors.transparent,
+          elevation: 2,
+          shadowColor: Colors.black.withOpacity(0.1),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: Colors.white,
+          indicatorColor: _accentTeal.withOpacity(0.2),
+          labelTextStyle: WidgetStateProperty.all(
+            GoogleFonts.lato(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ),
+        navigationRailTheme: NavigationRailThemeData(
+          backgroundColor: _primaryBlue,
+          selectedIconTheme: IconThemeData(color: _accentTeal),
+          unselectedIconTheme: IconThemeData(color: Colors.white.withOpacity(0.6)),
+          selectedLabelTextStyle: GoogleFonts.lato(color: _accentTeal, fontWeight: FontWeight.bold),
+          unselectedLabelTextStyle: GoogleFonts.lato(color: Colors.white.withOpacity(0.6)),
         ),
       ),
       home: _captainName == null
@@ -104,6 +143,7 @@ class _RswFleetAppState extends State<RswFleetApp> {
               captainName: _captainName!,
               pageIndex: _pageIndex,
               onTabChange: (i) => setState(() => _pageIndex = i),
+              onLogout: _handleLogout,
               speciesPage: SpeciesPage(
                 tripData: _trip,
                 onDateChange: _handleDateChange,
@@ -125,6 +165,7 @@ class _Shell extends StatelessWidget {
   final String captainName;
   final int pageIndex;
   final ValueChanged<int> onTabChange;
+  final VoidCallback onLogout;
   final Widget speciesPage;
   final Widget cisternsPage;
   final Widget summaryPage;
@@ -133,6 +174,7 @@ class _Shell extends StatelessWidget {
     required this.captainName,
     required this.pageIndex,
     required this.onTabChange,
+    required this.onLogout,
     required this.speciesPage,
     required this.cisternsPage,
     required this.summaryPage,
@@ -152,46 +194,89 @@ class _Shell extends StatelessWidget {
         final destinations = const [
           NavigationDestination(
             icon: Icon(Icons.science_outlined),
-            label: 'Species',
+            selectedIcon: Icon(Icons.science),
+            label: 'Species Sampling',
           ),
           NavigationDestination(
             icon: Icon(Icons.local_shipping_outlined),
-            label: 'Cisterns',
+            selectedIcon: Icon(Icons.local_shipping),
+            label: 'Cistern Logistics',
           ),
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
-            label: 'Summary',
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Trip Summary',
           ),
         ];
 
         if (isWide) {
           return Scaffold(
-            appBar: AppBar(
-              title: Text('RSW Fleet - Captain $captainName'),
-            ),
             body: Row(
               children: [
                 NavigationRail(
                   selectedIndex: pageIndex,
                   onDestinationSelected: onTabChange,
-                  labelType: NavigationRailLabelType.all,
+                  extended: true,
+                  leading: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.sailing, color: Colors.white, size: 40),
+                        const SizedBox(height: 8),
+                        Text(
+                          'RSW FLEET',
+                          style: GoogleFonts.montserrat(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   destinations: const [
                     NavigationRailDestination(
                       icon: Icon(Icons.science_outlined),
-                      label: Text('Species'),
+                      selectedIcon: Icon(Icons.science),
+                      label: Text('Species Sampling'),
                     ),
                     NavigationRailDestination(
                       icon: Icon(Icons.local_shipping_outlined),
-                      label: Text('Cisterns'),
+                      selectedIcon: Icon(Icons.local_shipping),
+                      label: Text('Cistern Logistics'),
                     ),
                     NavigationRailDestination(
                       icon: Icon(Icons.dashboard_outlined),
-                      label: Text('Summary'),
+                      selectedIcon: Icon(Icons.dashboard),
+                      label: Text('Trip Summary'),
                     ),
                   ],
                 ),
-                const VerticalDivider(width: 1),
-                Expanded(child: SafeArea(child: pages[pageIndex])),
+                Expanded(
+                  child: Column(
+                    children: [
+                      AppBar(
+                        title: Text('Captain $captainName'),
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF0A2342),
+                        elevation: 1,
+                        actions: [
+                          IconButton(
+                            icon: const Icon(Icons.notifications_outlined),
+                            onPressed: () {},
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.logout),
+                            onPressed: onLogout,
+                            tooltip: 'Logout',
+                          ),
+                          const SizedBox(width: 16),
+                        ],
+                      ),
+                      Expanded(child: pages[pageIndex]),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
@@ -199,9 +284,26 @@ class _Shell extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('RSW Fleet - Captain $captainName'),
+            title: Column(
+              children: [
+                Text(
+                  'RSW FLEET MANAGER',
+                  style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 1),
+                ),
+                Text(
+                  'Captain $captainName',
+                  style: GoogleFonts.lato(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.logout),
+                onPressed: onLogout,
+              ),
+            ],
           ),
-          body: SafeArea(child: pages[pageIndex]),
+          body: pages[pageIndex],
           bottomNavigationBar: NavigationBar(
             selectedIndex: pageIndex,
             onDestinationSelected: onTabChange,

@@ -1,5 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class LoginPage extends StatefulWidget {
   final ValueChanged<String> onLogin;
@@ -21,6 +24,12 @@ class _LoginPageState extends State<LoginPage> {
   bool _loading = false;
   String? _errorMessage;
 
+  // Maritime Color Palette
+  final Color _primaryBlue = const Color(0xFF0A2342); // Deep Ocean
+  final Color _accentTeal = const Color(0xFF2CA58D); // Sea Foam/Teal
+  final Color _surfaceWhite = const Color(0xFFFFFFFF);
+  final Color _textDark = const Color(0xFF1C1C1C);
+
   Future<void> _handleLogin() async {
     setState(() {
       _loading = true;
@@ -29,14 +38,19 @@ class _LoginPageState extends State<LoginPage> {
 
     final name = _nameController.text.trim();
     final password = _passwordController.text.trim();
-    final snapshot = await FirebaseFirestore.instance.collection('captains').get();
-    debugPrint('TEST DOCS => ${snapshot.docs.map((d) => d.data())}');
-    debugPrint('LOGIN DEBUG - Trying login ...');
-    debugPrint('Name entered: $name');
-    debugPrint('Password entered: $password');
+    
+    // Simulate a slight delay for better UX feel if local
+    if (name.isEmpty) {
+       setState(() {
+        _loading = false;
+        _errorMessage = "Please enter your captain name.";
+      });
+      return;
+    }
 
     try {
-      debugPrint('Firebase returned: ${snapshot.docs.length} documents');
+      final snapshot = await FirebaseFirestore.instance.collection('captains').get();
+      debugPrint('LOGIN DEBUG - Trying login ...');
 
       Map<String, dynamic>? matching;
       for (final doc in snapshot.docs) {
@@ -55,116 +69,21 @@ class _LoginPageState extends State<LoginPage> {
       } else {
         debugPrint('ERROR - No user found with this name/password');
         setState(() {
-          _errorMessage = "Invalid name or password.";
+          _errorMessage = "Invalid credentials. Check your logbook.";
         });
       }
     } catch (e) {
       debugPrint('FIREBASE LOGIN ERROR: $e');
       setState(() {
-        _errorMessage = "Connection error: $e";
+        _errorMessage = "Connection lost. Check radio/internet.";
       });
     }
 
-    setState(() {
-      _loading = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0EA5E9), Color(0xFF38BDF8), Color(0xFFF5FBFF)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Card(
-                elevation: 6,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircleAvatar(
-                        radius: 32,
-                        backgroundColor: const Color(0xFF0EA5E9).withValues(alpha: 0.12),
-                        child: const Icon(Icons.water, color: Color(0xFF0EA5E9), size: 36),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Fish Tank Operations',
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Secure access for captains to manage RSW tanks, species sampling, and cisterns.',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey[600]),
-                      ),
-                      const SizedBox(height: 18),
-                      TextField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: "Captain's name",
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.person_outline),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.lock_outline),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_errorMessage != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            _errorMessage!,
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: _loading ? null : _handleLogin,
-                          child: _loading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('Enter the Fleet'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    if (mounted) {
+      setState(() {
+        _loading = false;
+      });
+    }
   }
 
   String _extractName(Map<String, dynamic> data) {
@@ -173,12 +92,250 @@ class _LoginPageState extends State<LoginPage> {
         return (data[key] ?? '').toString().trim();
       }
     }
-    // Fallback: find the first key that resembles "name"
     for (final entry in data.entries) {
       if (entry.key.trim().toLowerCase().startsWith('name')) {
         return (entry.value ?? '').toString().trim();
       }
     }
     return '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          // 1. Background Image with Overlay
+          Positioned.fill(
+            child: Image.network(
+              'https://images.unsplash.com/photo-1534951009808-766178b47a4f?q=80&w=2070&auto=format&fit=crop',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [_primaryBlue, const Color(0xFF0F3460)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Dark overlay for readability
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.4),
+            ),
+          ),
+
+          // 2. Login Content
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Logo / Icon
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _surfaceWhite.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _accentTeal.withOpacity(0.5), width: 2),
+                    ),
+                    child: Icon(Icons.sailing, size: 64, color: _surfaceWhite),
+                  ).animate().fadeIn(duration: 600.ms).scale(delay: 200.ms),
+                  
+                  const SizedBox(height: 24),
+                  
+                  Text(
+                    'RSW FLEET MANAGER',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: _surfaceWhite,
+                      letterSpacing: 1.5,
+                    ),
+                  ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.3, end: 0),
+                  
+                  const SizedBox(height: 8),
+                  
+                  Text(
+                    'Captain\'s Log Access',
+                    style: GoogleFonts.lato(
+                      fontSize: 16,
+                      color: _surfaceWhite.withOpacity(0.8),
+                      letterSpacing: 0.5,
+                    ),
+                  ).animate().fadeIn(delay: 600.ms),
+
+                  const SizedBox(height: 48),
+
+                  // Glassmorphic Card
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: _surfaceWhite.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: _surfaceWhite.withOpacity(0.2)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildTextField(
+                              controller: _nameController,
+                              label: 'Captain Name',
+                              icon: Icons.person,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildTextField(
+                              controller: _passwordController,
+                              label: 'Password',
+                              icon: Icons.lock,
+                              isPassword: true,
+                            ),
+                            
+                            if (_errorMessage != null) ...[
+                              const SizedBox(height: 20),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _errorMessage!,
+                                        style: GoogleFonts.lato(color: Colors.redAccent, fontSize: 13),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ).animate().fadeIn(),
+                            ],
+
+                            const SizedBox(height: 32),
+
+                            SizedBox(
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: _loading ? null : _handleLogin,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _accentTeal,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  shadowColor: _accentTeal.withOpacity(0.5),
+                                ).copyWith(
+                                  elevation: WidgetStateProperty.resolveWith((states) {
+                                      if (states.contains(WidgetState.pressed)) return 0;
+                                      return 8;
+                                  }),
+                                ),
+                                child: _loading
+                                    ? const SizedBox(
+                                        height: 24,
+                                        width: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Text(
+                                        'BOARD SHIP',
+                                        style: GoogleFonts.montserrat(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ).animate().fadeIn(delay: 800.ms).slideY(begin: 0.2, end: 0),
+                  
+                  const SizedBox(height: 24),
+                  
+                  Text(
+                    '© 2025 RSW Marine Systems',
+                    style: GoogleFonts.lato(
+                      color: _surfaceWhite.withOpacity(0.4),
+                      fontSize: 12,
+                    ),
+                  ).animate().fadeIn(delay: 1200.ms),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: GoogleFonts.montserrat(
+            color: Colors.white.withOpacity(0.7),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
+          child: TextField(
+            controller: controller,
+            obscureText: isPassword,
+            style: GoogleFonts.lato(color: Colors.white, fontSize: 16),
+            cursorColor: _accentTeal,
+            decoration: InputDecoration(
+              prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.5), size: 20),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              hintText: isPassword ? '••••••••' : 'Enter $label',
+              hintStyle: GoogleFonts.lato(color: Colors.white.withOpacity(0.2)),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

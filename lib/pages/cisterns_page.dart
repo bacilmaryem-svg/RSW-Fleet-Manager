@@ -1,5 +1,6 @@
-// lib/pages/cisterns_page.dart
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../models/cistern.dart';
 
 class CisternsPage extends StatefulWidget {
@@ -21,30 +22,32 @@ class CisternsPage extends StatefulWidget {
 }
 
 class _CisternsPageState extends State<CisternsPage> {
-  static const double _kLeftMaxWidth = 320;
-  static const double _kInputHeight = 32;
-  static const EdgeInsets _kPad = EdgeInsets.symmetric(horizontal: 8, vertical: 6);
+  static const double _kLeftMaxWidth = 340;
+  static const EdgeInsets _kPad = EdgeInsets.symmetric(horizontal: 12, vertical: 12);
   static const BorderRadius _kRadius = BorderRadius.all(Radius.circular(8));
-  static const TextStyle _kInputText = TextStyle(fontSize: 12, height: 1.1);
+  
+  TextStyle get _kInputText => GoogleFonts.lato(fontSize: 13, color: const Color(0xFF0F172A));
+  TextStyle get _kLabelText => GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B));
 
-  static const double _wTruck = 96;
-  static const double _wTank = 96;
-  static const double _wStart = 60;
-  static const double _wEnd = 60;
-  static const double _wWater = 64;
-  static const double _wBuyer = 128;
-  static const double _wIn = 84;
-  static const double _wOut = 84;
-  static const double _wNet = 90;
-
-  static const double _kColSpacing = 4;
-  static const double _kHeadH = 26;
-  static const double _kRowH = 42;
-
-  InputDecoration get _decoration => const InputDecoration(
+  InputDecoration get _decoration => InputDecoration(
         isDense: true,
-        border: OutlineInputBorder(borderRadius: _kRadius),
+        filled: true,
+        fillColor: Colors.white,
+        hoverColor: const Color(0xFFF1F5F9),
+        border: OutlineInputBorder(
+          borderRadius: _kRadius,
+          borderSide: BorderSide(color: Colors.blueGrey.shade200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: _kRadius,
+          borderSide: BorderSide(color: Colors.blueGrey.shade100),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: _kRadius,
+          borderSide: BorderSide(color: Color(0xFF0EA5E9), width: 1.5),
+        ),
         contentPadding: _kPad,
+        suffixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       );
 
   late String _selectedTank;
@@ -64,8 +67,6 @@ class _CisternsPageState extends State<CisternsPage> {
     'DIPROMER',
     ...widget.buyers.map((e) => e.trim()).where((e) => e.isNotEmpty),
   };
-
-  bool _starterInserted = false;
 
   @override
   void initState() {
@@ -125,52 +126,27 @@ class _CisternsPageState extends State<CisternsPage> {
       final t = _tankTonnage[_selectedTank];
       _tonnageCtrl.text = (t == null || t == 0) ? '' : t.toStringAsFixed(0);
       _onTonnageChanged(_tonnageCtrl.text);
-      _starterInserted = false;
     });
   }
 
-  List<MapEntry<int, Cistern>> get _rowsForSelectedTank =>
-      widget.cisternsData.asMap().entries.where((e) => e.value.tank == _selectedTank).toList();
+  List<Cistern> get _rowsForSelectedTank =>
+      widget.cisternsData.where((c) => c.tank == _selectedTank).toList();
 
-  void _updateCistern(int index, void Function(Cistern c) updater) {
+  void _addOrUpdateCistern(Cistern cistern, {bool isNew = false}) {
     final list = List<Cistern>.from(widget.cisternsData);
-    updater(list[index]);
+    if (isNew) {
+      list.add(cistern);
+    } else {
+      final index = list.indexWhere((c) => c == cistern); // Note: Cistern needs equality or ID
+      // Since we don't have IDs, we might need to pass the index or original object
+      // For now, let's assume we replace the object in the list if it exists, or we might need to handle this better
+      // A better approach for this demo: remove the old one and add the new one, or update in place if we have index
+    }
     widget.onCisternsChange(list);
   }
-
-  void _addCistern() {
-    final list = List<Cistern>.from(widget.cisternsData)
-      ..add(Cistern(
-        id: '',
-        tank: _selectedTank,
-        start: '',
-        end: '',
-        water: '',
-        buyer: '',
-        weightIn: '',
-        weightOut: '',
-        netWeight: '',
-      ));
-    widget.onCisternsChange(list);
-  }
-
-  void _duplicateLastForTank() {
-    final all = List<Cistern>.from(widget.cisternsData);
-    final lastIndex = all.lastIndexWhere((c) => c.tank == _selectedTank);
-    if (lastIndex == -1) return;
-    final last = all[lastIndex];
-    all.add(Cistern(
-      id: '',
-      tank: _selectedTank,
-      start: last.start,
-      end: last.end,
-      water: last.water,
-      buyer: last.buyer,
-      weightIn: last.weightIn,
-      weightOut: last.weightOut,
-      netWeight: last.netWeight,
-    ));
-    widget.onCisternsChange(all);
+  
+  void _updateCisternList(List<Cistern> newList) {
+    widget.onCisternsChange(newList);
   }
 
   void _autoGenerateFromTonnage() {
@@ -193,40 +169,285 @@ class _CisternsPageState extends State<CisternsPage> {
     widget.onCisternsChange([...others, ...generated]);
   }
 
-  void _updateWeightsAuto(int index, {String? inText, String? outText}) {
-    final list = List<Cistern>.from(widget.cisternsData);
-    final c = list[index];
+  Future<void> _showCisternDialog({Cistern? cistern, int? index}) async {
+    final isEditing = cistern != null;
+    final tempCistern = cistern ?? Cistern(
+      id: '',
+      tank: _selectedTank,
+      start: '',
+      end: '',
+      water: '',
+      buyer: '',
+      weightIn: '',
+      weightOut: '',
+      netWeight: '',
+    );
 
-    final inStr = inText ?? c.weightIn;
-    final outStr = outText ?? c.weightOut;
+    // Controllers for the dialog
+    final idCtrl = TextEditingController(text: tempCistern.id);
+    final startCtrl = TextEditingController(text: tempCistern.start);
+    final endCtrl = TextEditingController(text: tempCistern.end);
+    final waterCtrl = TextEditingController(text: tempCistern.water);
+    final weightInCtrl = TextEditingController(text: tempCistern.weightIn);
+    final weightOutCtrl = TextEditingController(text: tempCistern.weightOut);
+    final netWeightCtrl = TextEditingController(text: tempCistern.netWeight);
+    
+    String currentBuyer = tempCistern.buyer;
+    String currentTank = tempCistern.tank.isNotEmpty ? tempCistern.tank : _selectedTank;
 
-    final inVal = double.tryParse(inStr.replaceAll(' ', '').replaceAll(',', '.'));
-    final outVal = double.tryParse(outStr.replaceAll(' ', '').replaceAll(',', '.'));
+    await showDialog(
+      context: context,
+      builder: (context) {
+        final width = MediaQuery.of(context).size.width;
+        final isMobile = width < 600;
 
-    c.weightIn = inStr;
-    c.weightOut = outStr;
+        return AlertDialog(
+          title: Text(isEditing ? 'Edit Cistern' : 'Add New Cistern', style: GoogleFonts.montserrat(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Container(
+              width: isMobile ? width * 0.9 : 500,
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildDialogField('Truck / Cistern ID', idCtrl),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: currentTank,
+                    items: widget.rswTanks.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                    onChanged: (v) => currentTank = v!,
+                    decoration: _decoration.copyWith(labelText: 'RSW Tank'),
+                  ),
+                  const SizedBox(height: 12),
+                  if (isMobile) ...[
+                    _buildDialogField(
+                      'Start Time',
+                      startCtrl,
+                      isReadOnly: true,
+                      onTap: () => _selectDateTime(context, startCtrl),
+                      suffixIcon: const Icon(Icons.calendar_today, size: 16),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDialogField(
+                      'End Time',
+                      endCtrl,
+                      isReadOnly: true,
+                      onTap: () => _selectDateTime(context, endCtrl),
+                      suffixIcon: const Icon(Icons.calendar_today, size: 16),
+                    ),
+                  ] else
+                    Row(
+                      children: [
+                        Expanded(child: _buildDialogField(
+                          'Start Time',
+                          startCtrl,
+                          isReadOnly: true,
+                          onTap: () => _selectDateTime(context, startCtrl),
+                          suffixIcon: const Icon(Icons.calendar_today, size: 16),
+                        )),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildDialogField(
+                          'End Time',
+                          endCtrl,
+                          isReadOnly: true,
+                          onTap: () => _selectDateTime(context, endCtrl),
+                          suffixIcon: const Icon(Icons.calendar_today, size: 16),
+                        )),
+                      ],
+                    ),
+                  const SizedBox(height: 12),
+                  _buildDialogField('Water (m³)', waterCtrl),
+                  const SizedBox(height: 12),
+                  _BuyerInput(
+                    initial: currentBuyer,
+                    options: _buyerOptions,
+                    decoration: _decoration.copyWith(labelText: 'Buyer'),
+                    textStyle: _kInputText,
+                    onChanged: (v) => currentBuyer = v,
+                  ),
+                  const SizedBox(height: 12),
+                  if (isMobile) ...[
+                    _buildDialogField('Weight IN', weightInCtrl, isNumber: true, onChanged: (v) {
+                       _calculateNet(weightInCtrl.text, weightOutCtrl.text, netWeightCtrl);
+                    }),
+                    const SizedBox(height: 12),
+                    _buildDialogField('Weight OUT', weightOutCtrl, isNumber: true, onChanged: (v) {
+                       _calculateNet(weightInCtrl.text, weightOutCtrl.text, netWeightCtrl);
+                    }),
+                  ] else
+                    Row(
+                      children: [
+                        Expanded(child: _buildDialogField('Weight IN', weightInCtrl, isNumber: true, onChanged: (v) {
+                           _calculateNet(weightInCtrl.text, weightOutCtrl.text, netWeightCtrl);
+                        })),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildDialogField('Weight OUT', weightOutCtrl, isNumber: true, onChanged: (v) {
+                           _calculateNet(weightInCtrl.text, weightOutCtrl.text, netWeightCtrl);
+                        })),
+                      ],
+                    ),
+                  const SizedBox(height: 12),
+                  _buildDialogField('Net Weight', netWeightCtrl, isReadOnly: true),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                // Save
+                final newCistern = Cistern(
+                  id: idCtrl.text,
+                  tank: currentTank,
+                  start: startCtrl.text,
+                  end: endCtrl.text,
+                  water: waterCtrl.text,
+                  buyer: currentBuyer,
+                  weightIn: weightInCtrl.text,
+                  weightOut: weightOutCtrl.text,
+                  netWeight: netWeightCtrl.text,
+                );
 
-    if (inVal != null && outVal != null) {
-      c.netWeight = (inVal - outVal).toStringAsFixed(0);
-    } else {
-      c.netWeight = '';
+                final list = List<Cistern>.from(widget.cisternsData);
+                if (isEditing && index != null) {
+                  list[index] = newCistern;
+                } else {
+                  list.add(newCistern);
+                }
+                _updateCisternList(list);
+                
+                if (currentBuyer.isNotEmpty) {
+                  setState(() {
+                    _buyerOptions.add(currentBuyer);
+                  });
+                }
+
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _calculateNet(String wIn, String wOut, TextEditingController netCtrl) {
+    final i = double.tryParse(wIn.replaceAll(' ', '').replaceAll(',', '.'));
+    final o = double.tryParse(wOut.replaceAll(' ', '').replaceAll(',', '.'));
+    if (i != null && o != null) {
+      netCtrl.text = (i - o).toStringAsFixed(0);
     }
-    widget.onCisternsChange(list);
+  }
+
+  Future<void> _selectDateTime(BuildContext context, TextEditingController controller, {VoidCallback? onChanged}) async {
+    final now = DateTime.now();
+    DateTime initialDate = now;
+    TimeOfDay initialTime = TimeOfDay.now();
+
+    if (controller.text.isNotEmpty) {
+      try {
+        final format = DateFormat('yyyy-MM-dd HH:mm');
+        final dt = format.parse(controller.text);
+        initialDate = dt;
+        initialTime = TimeOfDay.fromDateTime(dt);
+      } catch (_) {
+        // Ignore parse errors, use now
+      }
+    }
+
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2023),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF0EA5E9),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF0F172A),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null) {
+      if (!context.mounted) return;
+      
+      // Small delay to ensure smooth transition
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!context.mounted) return;
+
+      final TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: initialTime,
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: Color(0xFF0EA5E9),
+                onPrimary: Colors.white,
+                onSurface: Color(0xFF0F172A),
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (pickedTime != null) {
+        final dt = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+        controller.text = DateFormat('yyyy-MM-dd HH:mm').format(dt);
+        onChanged?.call();
+      }
+    }
+  }
+
+  Widget _buildDialogField(
+    String label,
+    TextEditingController ctrl, {
+    bool isNumber = false,
+    bool isReadOnly = false,
+    ValueChanged<String>? onChanged,
+    VoidCallback? onTap,
+    Widget? suffixIcon,
+  }) {
+    return TextField(
+      controller: ctrl,
+      readOnly: isReadOnly,
+      onTap: onTap,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      onChanged: onChanged,
+      decoration: _decoration.copyWith(
+        labelText: label,
+        suffixIcon: suffixIcon,
+      ),
+      style: _kInputText,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final rows = _rowsForSelectedTank;
-    final hasRows = rows.isNotEmpty;
-
-    if (!hasRows && !_starterInserted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_starterInserted) {
-          _starterInserted = true;
-          _addCistern();
-        }
-      });
+    
+    // Filter rows based on selected tank, but we need the original index to update correctly
+    final cisternCards = <Widget>[];
+    for (int i = 0; i < widget.cisternsData.length; i++) {
+      final c = widget.cisternsData[i];
+      if (c.tank == _selectedTank) {
+        cisternCards.add(_buildCisternCard(c, i));
+      }
     }
 
     return LayoutBuilder(
@@ -260,47 +481,52 @@ class _CisternsPageState extends State<CisternsPage> {
                   const SizedBox(height: 12),
                   Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5F8FC),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    padding: const EdgeInsets.all(12),
-                    child: _LabeledTable(rows: [
+                    padding: const EdgeInsets.all(16),
+                    child: _LabeledTable(
+                      labelStyle: _kLabelText,
+                      rows: [
                       LabeledRow(
                         label: 'Start offloading',
-                        field: SizedBox(
-                          height: _kInputHeight,
-                          child: TextField(
-                            controller: _startCtrl,
-                            keyboardType: TextInputType.datetime,
-                            decoration: _decoration,
-                            style: _kInputText,
-                            onChanged: _onStartChanged,
+                        field: TextField(
+                          controller: _startCtrl,
+                          readOnly: true,
+                          onTap: () => _selectDateTime(context, _startCtrl, onChanged: _updateOffloadingDuration),
+                          decoration: _decoration.copyWith(
+                            suffixIcon: const Icon(Icons.calendar_today, size: 16),
                           ),
+                          style: _kInputText,
                         ),
                       ),
                       LabeledRow(
                         label: 'Stop offloading',
-                        field: SizedBox(
-                          height: _kInputHeight,
-                          child: TextField(
-                            controller: _stopCtrl,
-                            keyboardType: TextInputType.datetime,
-                            decoration: _decoration,
-                            style: _kInputText,
-                            onChanged: _onStopChanged,
+                        field: TextField(
+                          controller: _stopCtrl,
+                          readOnly: true,
+                          onTap: () => _selectDateTime(context, _stopCtrl, onChanged: _updateOffloadingDuration),
+                          decoration: _decoration.copyWith(
+                            suffixIcon: const Icon(Icons.calendar_today, size: 16),
                           ),
+                          style: _kInputText,
                         ),
                       ),
                       LabeledRow(
                         label: 'Hours of offloading (auto)',
-                        field: SizedBox(
-                          height: _kInputHeight,
-                          child: TextField(
-                            controller: _durationCtrl,
-                            readOnly: true,
-                            decoration: _decoration,
-                            style: _kInputText,
-                          ),
+                        field: TextField(
+                          controller: _durationCtrl,
+                          readOnly: true,
+                          decoration: _decoration,
+                          style: _kInputText,
                         ),
                       ),
                     ]),
@@ -313,65 +539,63 @@ class _CisternsPageState extends State<CisternsPage> {
                   const SizedBox(height: 8),
                   Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5F8FC),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        _LabeledTable(rows: [
+                        _LabeledTable(
+                          labelStyle: _kLabelText,
+                          rows: [
                           LabeledRow(
                             label: 'RSW Tank',
-                            field: SizedBox(
-                              height: _kInputHeight,
-                              child: DropdownButtonFormField<String>(
-                                initialValue: _selectedTank.isEmpty ? null : _selectedTank,
-                                items: widget.rswTanks
-                                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                                    .toList(),
-                                onChanged: _onTankChanged,
-                                decoration: _decoration,
-                                style: _kInputText,
-                                isDense: true,
-                              ),
+                            field: DropdownButtonFormField<String>(
+                              initialValue: _selectedTank.isEmpty ? null : _selectedTank,
+                              items: widget.rswTanks
+                                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                                  .toList(),
+                              onChanged: _onTankChanged,
+                              decoration: _decoration,
+                              style: _kInputText,
+                              isDense: true,
                             ),
                           ),
                           LabeledRow(
                             label: 'Tonnage tank (kg)',
-                            field: SizedBox(
-                              height: _kInputHeight,
-                              child: TextField(
-                                controller: _tonnageCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: _decoration,
-                                style: _kInputText,
-                                onChanged: _onTonnageChanged,
-                              ),
+                            field: TextField(
+                              controller: _tonnageCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: _decoration,
+                              style: _kInputText,
+                              onChanged: _onTonnageChanged,
                             ),
                           ),
                           LabeledRow(
                             label: 'Capacity per cistern (kg)',
-                            field: SizedBox(
-                              height: _kInputHeight,
-                              child: TextField(
-                                controller: TextEditingController(text: _capacityPerCistern.toStringAsFixed(0)),
-                                readOnly: true,
-                                decoration: _decoration,
-                                style: _kInputText,
-                              ),
+                            field: TextField(
+                              controller: TextEditingController(text: _capacityPerCistern.toStringAsFixed(0)),
+                              readOnly: true,
+                              decoration: _decoration,
+                              style: _kInputText,
                             ),
                           ),
                           LabeledRow(
                             label: 'Cisterns required (auto)',
-                            field: SizedBox(
-                              height: _kInputHeight,
-                              child: TextField(
-                                controller: TextEditingController(
-                                    text: _requiredCisterns == 0 ? '' : _requiredCisterns.toString()),
-                                readOnly: true,
-                                decoration: _decoration,
-                                style: _kInputText,
-                              ),
+                            field: TextField(
+                              controller: TextEditingController(
+                                  text: _requiredCisterns == 0 ? '' : _requiredCisterns.toString()),
+                              readOnly: true,
+                              decoration: _decoration,
+                              style: _kInputText,
                             ),
                           ),
                         ]),
@@ -395,90 +619,94 @@ class _CisternsPageState extends State<CisternsPage> {
           ),
         );
 
-        final rightPanel = Card(
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  alignment: isNarrow ? WrapAlignment.start : WrapAlignment.end,
-                  children: [
-                    FilledButton.tonal(
-                      onPressed: _duplicateLastForTank,
-                      child: const Text('Duplicate last cistern'),
+        final rightPanel = Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 80), // Space for FAB
+              child: cisternCards.isEmpty 
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.local_shipping_outlined, size: 64, color: Colors.blueGrey.shade200),
+                        const SizedBox(height: 16),
+                        Text('No cisterns added for $_selectedTank', style: GoogleFonts.lato(color: Colors.blueGrey)),
+                      ],
                     ),
-                    OutlinedButton(onPressed: _addCistern, child: const Text('+ Add Cistern')),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minWidth: 880),
-                    child: _buildDataTable(theme),
+                  )
+                : GridView.count(
+                    crossAxisCount: isNarrow ? 1 : 2,
+                    childAspectRatio: 2.2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    children: cisternCards,
                   ),
-                ),
-              ],
             ),
-          ),
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: FloatingActionButton.extended(
+                onPressed: () => _showCisternDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text('Add Cistern'),
+                backgroundColor: const Color(0xFF0EA5E9),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
         );
 
         return Container(
           color: const Color(0xFFF5F8FC),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF007BFF), Color(0xFF38BDF8)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF007BFF), Color(0xFF38BDF8)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.local_shipping_outlined, color: Colors.white),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Unloading & Cisterns',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              Text(
-                                'Allocate cisterns from each tank\'s tonnage (25,000 kg base).',
-                                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(height: 16),
-                  isNarrow
+                  child: Row(
+                    children: [
+                      const Icon(Icons.local_shipping_outlined, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Unloading & Cisterns',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              'Manage cistern logistics for $_selectedTank',
+                              style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: isNarrow
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             leftPanel,
                             const SizedBox(height: 12),
-                            rightPanel,
+                            Expanded(child: rightPanel),
                           ],
                         )
                       : Row(
@@ -489,8 +717,8 @@ class _CisternsPageState extends State<CisternsPage> {
                             Expanded(child: rightPanel),
                           ],
                         ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -498,137 +726,99 @@ class _CisternsPageState extends State<CisternsPage> {
     );
   }
 
-  Widget _buildDataTable(ThemeData theme) {
-    InputDecoration cellDec() => _decoration.copyWith(contentPadding: _kPad);
+  Widget _buildCisternCard(Cistern c, int index) {
+    return Card(
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => _showCisternDialog(cistern: c, index: index),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.local_shipping, color: Color(0xFF0EA5E9), size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            c.id.isEmpty ? 'Unknown ID' : c.id,
+                            style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          Text(
+                            c.buyer.isEmpty ? 'No Buyer' : c.buyer,
+                            style: GoogleFonts.lato(color: Colors.grey.shade600, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    onPressed: () {
+                      // Delete logic
+                      final list = List<Cistern>.from(widget.cisternsData);
+                      list.removeAt(index);
+                      _updateCisternList(list);
+                    },
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildInfoColumn('Net Weight', '${c.netWeight} kg', isBold: true),
+                  _buildInfoColumn('Water', '${c.water} m³'),
+                  _buildInfoColumn('Time', '${c.start} - ${c.end}'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-    return DataTable(
-      columnSpacing: _kColSpacing,
-      headingRowHeight: _kHeadH,
-      dataRowMinHeight: _kRowH,
-      dataRowMaxHeight: _kRowH,
-      columns: const [
-        DataColumn(label: Text('Truck / Cistern')),
-        DataColumn(label: Text('RSW Tank')),
-        DataColumn(label: Text('Start')),
-        DataColumn(label: Text('End')),
-        DataColumn(label: Text('Water (m3)')),
-        DataColumn(label: Text('Buyer')),
-        DataColumn(label: Text('Weight IN (kg)')),
-        DataColumn(label: Text('Weight OUT (kg)')),
-        DataColumn(label: Text('Net weight (kg)')),
+  Widget _buildInfoColumn(String label, String value, {bool isBold = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.lato(fontSize: 11, color: Colors.grey.shade500)),
+        const SizedBox(height: 4),
+        Text(
+          value.isEmpty ? '-' : value,
+          style: GoogleFonts.lato(
+            fontSize: 14,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            color: const Color(0xFF0F172A),
+          ),
+        ),
       ],
-      rows: _rowsForSelectedTank.map((entry) {
-        final index = entry.key;
-        final c = entry.value;
-
-        return DataRow(cells: [
-          DataCell(SizedBox(
-            width: _wTruck,
-            child: TextFormField(
-              initialValue: c.id,
-              decoration: cellDec(),
-              style: _kInputText,
-              onChanged: (v) => _updateCistern(index, (ci) => ci.id = v),
-            ),
-          )),
-          DataCell(SizedBox(
-            width: _wTank,
-            child: DropdownButtonFormField<String>(
-              initialValue: c.tank.isEmpty ? _selectedTank : c.tank,
-              items: widget.rswTanks.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-              onChanged: (val) {
-                if (val == null) return;
-                _updateCistern(index, (ci) => ci.tank = val);
-              },
-              decoration: cellDec(),
-              style: _kInputText,
-              isDense: true,
-            ),
-          )),
-          DataCell(SizedBox(
-            width: _wStart,
-            child: TextFormField(
-              initialValue: c.start,
-              decoration: cellDec(),
-              style: _kInputText,
-              onChanged: (v) => _updateCistern(index, (ci) => ci.start = v),
-            ),
-          )),
-          DataCell(SizedBox(
-            width: _wEnd,
-            child: TextFormField(
-              initialValue: c.end,
-              decoration: cellDec(),
-              style: _kInputText,
-              onChanged: (v) => _updateCistern(index, (ci) => ci.end = v),
-            ),
-          )),
-          DataCell(SizedBox(
-            width: _wWater,
-            child: TextFormField(
-              initialValue: c.water,
-              decoration: cellDec(),
-              style: _kInputText,
-              onChanged: (v) => _updateCistern(index, (ci) => ci.water = v),
-            ),
-          )),
-          DataCell(SizedBox(
-            width: _wBuyer,
-            child: _BuyerInput(
-              initial: c.buyer,
-              options: _buyerOptions,
-              inputHeight: _kInputHeight,
-              decoration: _decoration,
-              textStyle: _kInputText,
-              onChanged: (val) {
-                final v = val.trim();
-                if (v.isEmpty) return;
-                setState(() => _buyerOptions.add(v));
-                _updateCistern(index, (ci) => ci.buyer = v);
-              },
-            ),
-          )),
-          DataCell(SizedBox(
-            width: _wIn,
-            child: TextFormField(
-              initialValue: c.weightIn,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.right,
-              decoration: cellDec(),
-              style: _kInputText,
-              onChanged: (v) => _updateWeightsAuto(index, inText: v),
-            ),
-          )),
-          DataCell(SizedBox(
-            width: _wOut,
-            child: TextFormField(
-              initialValue: c.weightOut,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.right,
-              decoration: cellDec(),
-              style: _kInputText,
-              onChanged: (v) => _updateWeightsAuto(index, outText: v),
-            ),
-          )),
-          DataCell(SizedBox(
-            width: _wNet,
-            child: TextFormField(
-              initialValue: c.netWeight,
-              readOnly: true,
-              textAlign: TextAlign.right,
-              decoration: cellDec(),
-              style: _kInputText,
-            ),
-          )),
-        ]);
-      }).toList(),
     );
   }
 }
 
 class _LabeledTable extends StatelessWidget {
   final List<LabeledRow> rows;
-  const _LabeledTable({required this.rows});
+  final TextStyle? labelStyle;
+  
+  const _LabeledTable({required this.rows, this.labelStyle});
 
   @override
   Widget build(BuildContext context) {
@@ -638,10 +828,10 @@ class _LabeledTable extends StatelessWidget {
       children: rows
           .map((r) => TableRow(children: [
                 Padding(
-                  padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
-                  child: Text(r.label, style: const TextStyle(fontSize: 12)),
+                  padding: const EdgeInsets.only(right: 12, top: 4, bottom: 4),
+                  child: Text(r.label, style: labelStyle ?? const TextStyle(fontSize: 12)),
                 ),
-                Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: r.field),
+                Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: r.field),
               ]))
           .toList(),
     );
@@ -657,7 +847,6 @@ class LabeledRow {
 class _BuyerInput extends StatefulWidget {
   final String initial;
   final Set<String> options;
-  final double inputHeight;
   final InputDecoration decoration;
   final TextStyle textStyle;
   final ValueChanged<String> onChanged;
@@ -665,7 +854,6 @@ class _BuyerInput extends StatefulWidget {
   const _BuyerInput({
     required this.initial,
     required this.options,
-    required this.inputHeight,
     required this.decoration,
     required this.textStyle,
     required this.onChanged,
@@ -714,16 +902,13 @@ class _BuyerInputState extends State<_BuyerInput> {
         _commitIfValid();
       },
       fieldViewBuilder: (context, controller, focusNode, _) {
-        return SizedBox(
-          height: widget.inputHeight,
-          child: TextField(
-            controller: controller,
-            focusNode: focusNode,
-            textInputAction: TextInputAction.done,
-            decoration: widget.decoration,
-            style: widget.textStyle,
-            onEditingComplete: _commitIfValid,
-          ),
+        return TextField(
+          controller: controller,
+          focusNode: focusNode,
+          textInputAction: TextInputAction.done,
+          decoration: widget.decoration,
+          style: widget.textStyle,
+          onEditingComplete: _commitIfValid,
         );
       },
       optionsViewBuilder: (context, onSelected, options) {
@@ -742,7 +927,7 @@ class _BuyerInputState extends State<_BuyerInput> {
                   return ListTile(
                     dense: true,
                     visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-                    title: Text(opt, style: const TextStyle(fontSize: 12)),
+                    title: Text(opt, style: GoogleFonts.lato(fontSize: 13)),
                     onTap: () => onSelected(opt),
                   );
                 },
