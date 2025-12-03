@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "699399167394",
+    "project_id": "fish-tank-5b754",
+    "storage_bucket": "fish-tank-5b754.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:699399167394:android:0ff2d0ef4839693bc9e6fb",
+        "android_client_info": {
+          "package_name": "com.example.rsw_fleet_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhgRHzUtWW0QOkscUHcA3YsDixweUr238"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
