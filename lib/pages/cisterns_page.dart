@@ -768,14 +768,28 @@ class _CisternsPageState extends State<CisternsPage> {
                       ),
                     ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                    onPressed: () {
-                      // Delete logic
-                      final list = List<Cistern>.from(widget.cisternsData);
-                      list.removeAt(index);
-                      _updateCisternList(list);
-                    },
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.copy, color: Colors.blueGrey),
+                        tooltip: 'Duplicate',
+                        onPressed: () {
+                          final list = List<Cistern>.from(widget.cisternsData);
+                          // Insert the copy right after the original
+                          list.insert(index + 1, c.copyWith(id: '${c.id}-copy'));
+                          _updateCisternList(list);
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                        onPressed: () {
+                          // Delete logic
+                          final list = List<Cistern>.from(widget.cisternsData);
+                          list.removeAt(index);
+                          _updateCisternList(list);
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

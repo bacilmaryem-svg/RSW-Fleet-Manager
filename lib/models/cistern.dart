@@ -48,4 +48,30 @@ class Cistern {
     netWeight: map['netWeight'] ?? '',
     tripId: map['tripId'] ?? '',
   );
+
+  Cistern copyWith({
+    String? id,
+    String? tank,
+    String? start,
+    String? end,
+    String? water,
+    String? buyer,
+    String? weightIn,
+    String? weightOut,
+    String? netWeight,
+    String? tripId,
+  }) {
+    return Cistern(
+      id: id ?? this.id,
+      tank: tank ?? this.tank,
+      start: start ?? this.start,
+      end: end ?? this.end,
+      water: water ?? this.water,
+      buyer: buyer ?? this.buyer,
+      weightIn: weightIn ?? this.weightIn,
+      weightOut: weightOut ?? this.weightOut,
+      netWeight: netWeight ?? this.netWeight,
+      tripId: tripId ?? this.tripId,
+    );
+  }
 }

@@ -107,8 +107,8 @@ class _LoginPageState extends State<LoginPage> {
         children: [
           // 1. Background Image with Overlay
           Positioned.fill(
-            child: Image.network(
-              'https://images.unsplash.com/photo-1534951009808-766178b47a4f?q=80&w=2070&auto=format&fit=crop',
+            child: Image.asset(
+              'assets/images/ship_login.png',
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
