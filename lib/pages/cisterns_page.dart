@@ -151,19 +151,25 @@ class _CisternsPageState extends State<CisternsPage> {
 
   void _autoGenerateFromTonnage() {
     if (_requiredCisterns <= 0) return;
+    
+    final start = _startCtrl.text;
+    final end = _stopCtrl.text;
+    final totalTonnage = _tankTonnage[_selectedTank] ?? 0;
+    final avgWeight = totalTonnage > 0 ? (totalTonnage / _requiredCisterns).floor().toString() : '';
+
     final others = widget.cisternsData.where((c) => c.tank != _selectedTank).toList();
     final generated = List<Cistern>.generate(
       _requiredCisterns,
-      (_) => Cistern(
+      (index) => Cistern(
         id: '',
         tank: _selectedTank,
-        start: '',
-        end: '',
+        start: start,
+        end: end,
         water: '',
         buyer: '',
         weightIn: '',
         weightOut: '',
-        netWeight: '',
+        netWeight: avgWeight,
       ),
     );
     widget.onCisternsChange([...others, ...generated]);
@@ -342,26 +348,21 @@ class _CisternsPageState extends State<CisternsPage> {
   }
 
   Future<void> _selectDateTime(BuildContext context, TextEditingController controller, {VoidCallback? onChanged}) async {
-    final now = DateTime.now();
-    DateTime initialDate = now;
     TimeOfDay initialTime = TimeOfDay.now();
 
     if (controller.text.isNotEmpty) {
       try {
-        final format = DateFormat('yyyy-MM-dd HH:mm');
+        final format = DateFormat('HH:mm');
         final dt = format.parse(controller.text);
-        initialDate = dt;
         initialTime = TimeOfDay.fromDateTime(dt);
       } catch (_) {
         // Ignore parse errors, use now
       }
     }
 
-    final DateTime? pickedDate = await showDatePicker(
+    final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(2023),
-      lastDate: DateTime(2030),
+      initialTime: initialTime,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -376,41 +377,17 @@ class _CisternsPageState extends State<CisternsPage> {
       },
     );
 
-    if (pickedDate != null) {
-      if (!context.mounted) return;
-      
-      // Small delay to ensure smooth transition
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (!context.mounted) return;
-
-      final TimeOfDay? pickedTime = await showTimePicker(
-        context: context,
-        initialTime: initialTime,
-        builder: (context, child) {
-          return Theme(
-            data: Theme.of(context).copyWith(
-              colorScheme: const ColorScheme.light(
-                primary: Color(0xFF0EA5E9),
-                onPrimary: Colors.white,
-                onSurface: Color(0xFF0F172A),
-              ),
-            ),
-            child: child!,
-          );
-        },
+    if (pickedTime != null) {
+      final now = DateTime.now();
+      final dt = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        pickedTime.hour,
+        pickedTime.minute,
       );
-
-      if (pickedTime != null) {
-        final dt = DateTime(
-          pickedDate.year,
-          pickedDate.month,
-          pickedDate.day,
-          pickedTime.hour,
-          pickedTime.minute,
-        );
-        controller.text = DateFormat('yyyy-MM-dd HH:mm').format(dt);
-        onChanged?.call();
-      }
+      controller.text = DateFormat('HH:mm').format(dt);
+      onChanged?.call();
     }
   }
 
@@ -619,107 +596,127 @@ class _CisternsPageState extends State<CisternsPage> {
           ),
         );
 
-        final rightPanel = Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 80), // Space for FAB
-              child: cisternCards.isEmpty 
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.local_shipping_outlined, size: 64, color: Colors.blueGrey.shade200),
-                        const SizedBox(height: 16),
-                        Text('No cisterns added for $_selectedTank', style: GoogleFonts.lato(color: Colors.blueGrey)),
-                      ],
-                    ),
-                  )
-                : GridView.count(
-                    crossAxisCount: isNarrow ? 1 : 2,
-                    childAspectRatio: 2.2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    children: cisternCards,
-                  ),
-            ),
-            Positioned(
-              bottom: 16,
-              right: 16,
-              child: FloatingActionButton.extended(
-                onPressed: () => _showCisternDialog(),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Cistern'),
-                backgroundColor: const Color(0xFF0EA5E9),
-                foregroundColor: Colors.white,
+        // Helper to build the grid
+        Widget buildGrid({bool scrollable = true}) {
+          if (cisternCards.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.local_shipping_outlined, size: 64, color: Colors.blueGrey.shade200),
+                  const SizedBox(height: 16),
+                  Text('No cisterns added for $_selectedTank', style: GoogleFonts.lato(color: Colors.blueGrey)),
+                ],
               ),
+            );
+          }
+          return GridView.builder(
+            shrinkWrap: !scrollable,
+            physics: scrollable ? null : const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: isNarrow ? 1 : 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              mainAxisExtent: 420,
             ),
-          ],
+            itemCount: cisternCards.length,
+            itemBuilder: (context, index) => cisternCards[index],
+          );
+        }
+
+        final fab = FloatingActionButton.extended(
+          onPressed: () => _showCisternDialog(),
+          icon: const Icon(Icons.add),
+          label: const Text('Add Cistern'),
+          backgroundColor: const Color(0xFF0EA5E9),
+          foregroundColor: Colors.white,
         );
 
         return Container(
           color: const Color(0xFFF5F8FC),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF007BFF), Color(0xFF38BDF8)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.local_shipping_outlined, color: Colors.white),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Unloading & Cisterns',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              'Manage cistern logistics for $_selectedTank',
-                              style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-                            ),
-                          ],
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF007BFF), Color(0xFF38BDF8)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
                         ),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    ],
-                  ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.local_shipping_outlined, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Unloading & Cisterns',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Text(
+                                  'Manage cistern logistics for $_selectedTank',
+                                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: isNarrow
+                          ? SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  leftPanel,
+                                  const SizedBox(height: 12),
+                                  buildGrid(scrollable: false),
+                                  const SizedBox(height: 80), // Space for FAB
+                                ],
+                              ),
+                            )
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                leftPanel,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Stack(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 80),
+                                        child: buildGrid(scrollable: true),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: isNarrow
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            leftPanel,
-                            const SizedBox(height: 12),
-                            Expanded(child: rightPanel),
-                          ],
-                        )
-                      : Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            leftPanel,
-                            const SizedBox(width: 12),
-                            Expanded(child: rightPanel),
-                          ],
-                        ),
-                ),
-              ],
-            ),
+              ),
+              Positioned(
+                bottom: 16,
+                right: 16,
+                child: fab,
+              ),
+            ],
           ),
         );
       },
@@ -728,62 +725,102 @@ class _CisternsPageState extends State<CisternsPage> {
 
   Widget _buildCisternCard(Cistern c, int index) {
     return Card(
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      color: () {
+        int filled = 0;
+        if (c.start.isNotEmpty) filled++;
+        if (c.end.isNotEmpty) filled++;
+        if (c.water.isNotEmpty) filled++;
+        if (c.buyer.isNotEmpty) filled++;
+        if (c.weightIn.isNotEmpty) filled++;
+        if (c.weightOut.isNotEmpty) filled++;
+        if (c.netWeight.isNotEmpty) filled++;
+
+        if (filled == 0) return Colors.red.shade50;
+        if (filled == 7) return Colors.white;
+        return Colors.amber.shade50;
+      }(),
       child: InkWell(
         onTap: () => _showCisternDialog(cistern: c, index: index),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header: Icon, ID, Actions
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.local_shipping, color: Color(0xFF0EA5E9), size: 20),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [const Color(0xFF0EA5E9).withOpacity(0.15), const Color(0xFF0EA5E9).withOpacity(0.05)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            c.id.isEmpty ? 'Unknown ID' : c.id,
-                            style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          Text(
-                            c.buyer.isEmpty ? 'No Buyer' : c.buyer,
-                            style: GoogleFonts.lato(color: Colors.grey.shade600, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.local_shipping_rounded, color: Color(0xFF0EA5E9), size: 24),
                   ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          c.id.isEmpty ? 'Unknown ID' : c.id,
+                          style: GoogleFonts.montserrat(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                        if (c.tripId.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.blueGrey.shade50,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Trip: ${c.tripId}',
+                                style: GoogleFonts.lato(
+                                  fontSize: 11,
+                                  color: Colors.blueGrey.shade600,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  // Actions
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.copy, color: Colors.blueGrey),
-                        tooltip: 'Duplicate',
+                      _ActionButton(
+                        icon: Icons.copy_rounded,
+                        color: Colors.blueGrey.shade400,
                         onPressed: () {
                           final list = List<Cistern>.from(widget.cisternsData);
-                          // Insert the copy right after the original
                           list.insert(index + 1, c.copyWith(id: '${c.id}-copy'));
                           _updateCisternList(list);
                         },
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                      const SizedBox(width: 8),
+                      _ActionButton(
+                        icon: Icons.delete_outline_rounded,
+                        color: Colors.redAccent.shade200,
                         onPressed: () {
-                          // Delete logic
                           final list = List<Cistern>.from(widget.cisternsData);
                           list.removeAt(index);
                           _updateCisternList(list);
@@ -793,13 +830,107 @@ class _CisternsPageState extends State<CisternsPage> {
                   ),
                 ],
               ),
-              const Divider(height: 24),
+              
+              const SizedBox(height: 20),
+              
+              // Buyer Section
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.business_rounded, size: 18, color: Colors.blueGrey.shade400),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Buyer: ',
+                      style: GoogleFonts.lato(fontSize: 13, color: Colors.blueGrey.shade600),
+                    ),
+                    Expanded(
+                      child: Text(
+                        c.buyer.isEmpty ? 'Not specified' : c.buyer,
+                        style: GoogleFonts.lato(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF334155),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Data Grid
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildInfoColumn('Net Weight', '${c.netWeight} kg', isBold: true),
-                  _buildInfoColumn('Water', '${c.water} m³'),
-                  _buildInfoColumn('Time', '${c.start} - ${c.end}'),
+                  Expanded(child: _DataCell(label: 'Start Time', value: c.start, icon: Icons.schedule_rounded)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _DataCell(label: 'End Time', value: c.end, icon: Icons.update_rounded)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _DataCell(label: 'Weight IN', value: '${c.weightIn} kg', icon: Icons.download_rounded)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _DataCell(label: 'Weight OUT', value: '${c.weightOut} kg', icon: Icons.upload_rounded)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _DataCell(label: 'Water', value: '${c.water} m³', icon: Icons.water_drop_rounded)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [const Color(0xFF0EA5E9).withOpacity(0.1), const Color(0xFF0EA5E9).withOpacity(0.05)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF0EA5E9).withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.scale_rounded, size: 14, color: Color(0xFF0EA5E9)),
+                              const SizedBox(width: 6),
+                              Text(
+                                'NET WEIGHT',
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0EA5E9),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${c.netWeight} kg',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -950,6 +1081,68 @@ class _BuyerInputState extends State<_BuyerInput> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const _ActionButton({required this.icon, required this.color, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, size: 20, color: color),
+        ),
+      ),
+    );
+  }
+}
+
+class _DataCell extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _DataCell({required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 14, color: Colors.blueGrey.shade300),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.lato(fontSize: 11, color: Colors.blueGrey.shade500, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 20),
+          child: Text(
+            value.isEmpty ? '-' : value,
+            style: GoogleFonts.lato(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF334155),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
